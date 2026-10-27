@@ -557,14 +557,19 @@ void host_word_wrap(void) {
         // wrap [p, p+n)
         size_t a = 0;
         do {
-            size_t best = 0, sp = 0, i = a;
+            size_t best = 0, sp = 0, soft = 0, i = a;
+            uint32_t prev = 0;
             char tmp[4096];
             while (i < n) {
-                const char *q = p + i; utf8(&q);
+                const char *q = p + i; uint32_t c = utf8(&q);
+                // Thai syllable boundaries, for runs without spaces: before a leading vowel, after sara a/am/thanthakhat
+                if (i > a && is_thai(c) && ((c >= 0x0E40 && c <= 0x0E44) ||
+                    ((prev == 0x0E30 || prev == 0x0E33 || prev == 0x0E4C) && c >= 0x0E01 && c <= 0x0E2E))) soft = i;
+                prev = c;
                 size_t ni = (size_t)(q - p);
                 // never split before a combining mark or a following vowel
                 while (ni < n) { const char *r = p + ni; uint32_t c2 = utf8(&r); int aw, lsb;
-                    if (is_thai(c2)) { stbtt_GetGlyphHMetrics(&thai, stbtt_FindGlyphIndex(&thai, c2), &aw, &lsb); if (aw == 0 || c2 == 0x0E30 || c2 == 0x0E32 || c2 == 0x0E33 || c2 == 0x0E45) { ni = (size_t)(r - p); continue; } }
+                    if (is_thai(c2)) { stbtt_GetGlyphHMetrics(&thai, stbtt_FindGlyphIndex(&thai, c2), &aw, &lsb); if (aw == 0 || c2 == 0x0E30 || c2 == 0x0E32 || c2 == 0x0E33 || c2 == 0x0E45) { ni = (size_t)(r - p); prev = c2; continue; } }
                     break; }
                 size_t len = ni - a; if (len > sizeof tmp - 1) len = sizeof tmp - 1;
                 memcpy(tmp, p + a, len); tmp[len] = 0;
@@ -575,6 +580,7 @@ void host_word_wrap(void) {
             }
             size_t cut = best;
             if (best < n && sp > a) cut = sp;              // back to the last space in the line
+            else if (best < n && soft > a) cut = soft;     // else to the last Thai syllable boundary
             if (cut <= a) cut = best > a ? best : n;
             starts[nl++] = (int)o;
             memcpy(buf + o, p + a, cut - a); o += cut - a; buf[o++] = 0;
