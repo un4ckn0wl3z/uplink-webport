@@ -1,0 +1,65 @@
+# WebAssembly build (Emscripten).  Usage: make -f Makefile.web -j8 EMSDK=D:/AI/hb4/tools/emsdk
+EMSDK   ?= $(HOME)/emsdk
+export EMSDK
+export EM_CONFIG = $(EMSDK)/.emscripten
+EMPY    ?= $(firstword $(wildcard $(EMSDK)/python/*/python.exe) python3)
+EMCC    = $(EMPY) $(EMSDK)/upstream/emscripten/emcc.py
+GAME    = ..
+BUILD   = build_web
+OUT     = $(BUILD)/out
+MIK     = thirdparty/libmikmod
+
+CFLAGS  = -O2 -fno-strict-aliasing -sUSE_SDL=2 -Isrc -Igen -I$(MIK)/include -Ithirdparty -Wno-unused-function
+GENFLAGS= -O2 -fno-strict-aliasing -w -Isrc -Igen
+MIKFLAGS= -O2 -w -DHAVE_CONFIG_H -DMIKMOD_BUILD -DMIKMOD_STATIC -I$(MIK) -I$(MIK)/include
+
+# Original game data, unchanged: the recompiled engine reads its own archives. No installer, uninstaller,
+# GOG files, crash reporter or old saves. The Thai language pack (lang/th) is built by tools/build_lang.py.
+GAME_EXE  = uplink.exe
+GAME_DATA = data.dat fonts.dat graphics.dat loading.dat music.dat patch.dat patch2.dat patch3.dat sounds.dat world.dat
+ASSETS  = --preload-file $(GAME)/$(GAME_EXE)@/game/$(GAME_EXE) \
+          $(foreach d,$(GAME_DATA),--preload-file $(GAME)/$(d)@/game/$(d)) \
+          $(if $(wildcard lang/th/strings.tsv),--preload-file lang/th@/lang/th)
+
+LDFLAGS = -O2 -sUSE_SDL=2 -sINITIAL_MEMORY=512MB -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=2GB \
+          -sSTACK_SIZE=8MB -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sENVIRONMENT=web \
+          -sEXPORTED_RUNTIME_METHODS=callMain,ccall,cwrap,UTF8ToString,ENV,FS -lidbfs.js \
+          --pre-js web/prejs.js --shell-file web/shell.html $(ASSETS)
+
+MIK_SRC = $(MIK)/mmio/mmalloc.c $(MIK)/mmio/mmerror.c $(MIK)/mmio/mmio.c \
+          $(MIK)/playercode/mdriver.c $(MIK)/playercode/mloader.c $(MIK)/playercode/mlutil.c \
+          $(MIK)/playercode/mplayer.c $(MIK)/playercode/munitrk.c $(MIK)/playercode/mwav.c \
+          $(MIK)/playercode/npertab.c $(MIK)/playercode/sloader.c $(MIK)/playercode/virtch.c \
+          $(MIK)/playercode/virtch2.c $(MIK)/playercode/virtch_common.c $(MIK)/playercode/mdulaw.c \
+          $(MIK)/loaders/load_uni.c $(MIK)/drivers/drv_nos.c $(MIK)/posix/strcasecmp.c \
+          $(MIK)/depackers/mmcmp.c $(MIK)/depackers/pp20.c $(MIK)/depackers/s404.c $(MIK)/depackers/xpk.c
+GEN_SRC = $(wildcard gen/rec_*.c)
+SRC     = $(wildcard src/*.c)
+OBJ     = $(patsubst gen/%.c,$(BUILD)/gen/%.o,$(GEN_SRC)) $(patsubst src/%.c,$(BUILD)/src/%.o,$(SRC)) \
+          $(patsubst $(MIK)/%.c,$(BUILD)/mik/%.o,$(MIK_SRC))
+
+# stop make from trying to regenerate makefiles via built-in rules
+.DEFAULT_GOAL := all
+Makefile Makefile.web: ;
+
+all: $(OUT)/index.html
+
+$(OUT)/index.html: $(OBJ) web/shell.html web/prejs.js $(wildcard lang/th/*)
+	@mkdir -p $(OUT)
+	$(EMCC) -o $@ $(OBJ) $(LDFLAGS)
+	python tools/web_stamp.py $(OUT)
+
+$(BUILD)/gen/%.o: gen/%.c src/recomp.h gen/rec_funcs.h
+	@mkdir -p $(BUILD)/gen
+	$(EMCC) $(GENFLAGS) -c $< -o $@
+
+$(BUILD)/src/%.o: src/%.c src/recomp.h src/host.h src/gl.h src/port_config.h
+	@mkdir -p $(BUILD)/src
+	$(EMCC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/mik/%.o: $(MIK)/%.c
+	@mkdir -p $(dir $@)
+	$(EMCC) $(MIKFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(BUILD)

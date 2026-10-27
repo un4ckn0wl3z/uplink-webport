@@ -1,0 +1,16 @@
+# Everything derived from the user's copy of Uplink stays out of the repository:
+# the generated C, the analysis of uplink.exe, builds (the web build packages the game data), runs and saves,
+# and the Thai table (a translation of the game's own text; tools/lang/ rebuilds the English source lines).
+gen/
+analysis/
+build/
+build_web/
+build_web.log
+run/
+ghidra_proj/
+lang/th/src/
+lang/th/strings.tsv
+*.bmp
+port.log
+shot_*.png
+tools/lang/fix_quotes_th.py

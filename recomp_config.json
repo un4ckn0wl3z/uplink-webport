@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "0x4ee826": ["host_gci_loop", "0x4eea6c"],
+    "0x4eea67": ["host_gci_iter_end", "0x4eea6c"]
+  },
+  "hle": {
+    "_memcpy": "hle_memcpy", "_memmove": "hle_memcpy", "_memset": "hle_memset", "_strlen": "hle_strlen",
+    "__setjmp3": "hle_setjmp3"
+  },
+  "entries": ["0x4ee829",
+              "0x555331", "0x555b2d", "0x555b32", "0x555471"],
+  "wraps": {
+    "0x4ea0b0": "host_draw_text",
+    "0x4ea120": "host_text_width",
+    "0x490690": "host_word_wrap"
+  }
+}

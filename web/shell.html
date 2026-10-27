@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uplink (Web Port)</title>
+<style>
+  :root { --bg: #04070c; --fg: #cfe3ff; --muted: #6d86a6; --accent: #2f7fff; --panel: #0c1424; --line: #1d2b44; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+               font: 14px/1.5 "Segoe UI", Tahoma, "Noto Sans Thai", system-ui, sans-serif; overflow: hidden; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; background: #000; outline: none; }
+  #overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; text-align: center;
+             justify-content: center; gap: 16px; background: rgba(2, 4, 8, .94); padding: 16px; }
+  #overlay h1 { margin: 0; font-size: 30px; letter-spacing: .35em; font-weight: 300; }
+  #status { color: var(--muted); min-height: 1.5em; max-width: 520px; }
+  #bar { width: min(360px, 80vw); height: 4px; background: var(--panel); overflow: hidden; }
+  #bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  #lang { display: none; gap: 8px; }
+  #lang button { padding: 6px 16px; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+                 border-radius: 3px; cursor: pointer; font: inherit; }
+  #lang button.on { border-color: var(--accent); color: #fff; }
+  #play { display: none; padding: 10px 30px; font: inherit; font-size: 16px; color: #fff; background: var(--accent);
+          border: 0; border-radius: 3px; cursor: pointer; }
+  #help { color: var(--muted); font-size: 12px; max-width: 560px; }
+  #tools { position: fixed; right: 10px; bottom: 10px; display: flex; gap: 6px; opacity: .3; transition: opacity .2s; }
+  #tools:hover { opacity: 1; }
+  #tools button { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 3px;
+                  padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas></div>
+<div id="overlay">
+  <h1>UPLINK</h1>
+  <div id="bar"><div></div></div>
+  <div id="status">กำลังโหลด… / Loading…</div>
+  <div id="lang"><button data-l="th">ภาษาไทย</button><button data-l="en">English</button></div>
+  <button id="play">เริ่มเกม / Play</button>
+  <div id="help">คลิกในเกมเพื่อใช้คีย์บอร์ด · เซฟเกมเก็บไว้ในเบราว์เซอร์นี้<br>
+    Click inside the game for keyboard focus. Saves are kept in this browser.</div>
+</div>
+<div id="tools"><button id="fs">Fullscreen</button></div>
+<script>
+(function () {
+  var canvas = document.getElementById('canvas');
+  var overlay = document.getElementById('overlay');
+  var statusEl = document.getElementById('status');
+  var barEl = document.querySelector('#bar > div');
+  var playBtn = document.getElementById('play');
+  var langBox = document.getElementById('lang');
+  var ready = false;
+  var lang = 'th';
+  try { lang = localStorage.getItem('uplink.lang') || 'th'; } catch (e) {}
+  function showLang() {
+    langBox.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset.l === lang); });
+  }
+  langBox.addEventListener('click', function (e) {
+    var l = e.target.dataset && e.target.dataset.l;
+    if (!l) return;
+    lang = l;
+    try { localStorage.setItem('uplink.lang', l); } catch (err) {}
+    showLang();
+  });
+  showLang();
+
+  function fit() {
+    var w = canvas.width || 1024, h = canvas.height || 768;
+    var s = Math.min(window.innerWidth / w, window.innerHeight / h);
+    canvas.style.width = Math.floor(w * s) + 'px';
+    canvas.style.height = Math.floor(h * s) + 'px';
+  }
+  window.addEventListener('resize', fit);
+  new MutationObserver(fit).observe(canvas, { attributes: true, attributeFilter: ['width', 'height'] });
+
+  window.Module = {
+    canvas: canvas,
+    noInitialRun: true,
+    // each build has its own URLs (tools/web_stamp.py fills in the build id)
+    locateFile: function (p) { return p + '?v=__BUILD_ID__'; },
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.warn(t); },
+    setStatus: function (t) {
+      var m = t.match(/\((\d+(\.\d+)?)\/(\d+)\)/);
+      if (m) barEl.style.width = (100 * m[1] / m[3]).toFixed(1) + '%';
+    },
+    onRuntimeInitialized: function () {
+      barEl.style.width = '100%';
+      ready = true;
+      statusEl.textContent = 'พร้อมแล้ว / Ready';
+      langBox.style.display = 'flex';
+      playBtn.style.display = 'block';
+    },
+    onGameExit: function () {
+      overlay.style.display = 'flex';
+      playBtn.style.display = 'none'; langBox.style.display = 'none';
+      statusEl.textContent = 'ออกจากเกมแล้ว โหลดหน้าใหม่เพื่อเล่นอีกครั้ง / Game closed. Reload the page to play again.';
+    },
+    onAbort: function (what) {
+      overlay.style.display = 'flex';
+      playBtn.style.display = 'none'; langBox.style.display = 'none';
+      statusEl.textContent = 'The game stopped: ' + what + ' (see the browser console).';
+    }
+  };
+  playBtn.addEventListener('click', function () {
+    if (!ready) return;
+    playBtn.style.display = 'none';
+    overlay.style.display = 'none';
+    canvas.focus();
+    Module.callMain(['/game', '/save', '--lang', lang]);
+    fit();
+  });
+  canvas.addEventListener('mousedown', function () { canvas.focus(); });
+  // SDL takes a button's position from the last mouse move; some inputs (taps, embedded browsers) click without
+  // moving first, so send the move the press implies before SDL sees the press
+  var lastX = -1, lastY = -1;
+  window.addEventListener('mousemove', function (e) { lastX = e.clientX; lastY = e.clientY; }, true);
+  window.addEventListener('mousedown', function (e) {
+    if (e.target === canvas && (e.clientX !== lastX || e.clientY !== lastY))
+      canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: e.clientX, clientY: e.clientY, bubbles: true }));
+  }, true);
+  document.getElementById('fs').addEventListener('click', function () {
+    var el = document.getElementById('stage');
+    (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+  });
+})();
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>
