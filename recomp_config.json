@@ -12,6 +12,7 @@
   "wraps": {
     "0x4ea0b0": "host_draw_text",
     "0x4ea120": "host_text_width",
-    "0x490690": "host_word_wrap"
+    "0x490690": "host_word_wrap",
+    "0x492480": "host_get_option"
   }
 }

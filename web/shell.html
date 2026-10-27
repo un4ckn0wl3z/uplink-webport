@@ -16,10 +16,11 @@
   #status { color: var(--muted); min-height: 1.5em; max-width: 520px; }
   #bar { width: min(360px, 80vw); height: 4px; background: var(--panel); overflow: hidden; }
   #bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
-  #lang { display: none; gap: 8px; }
-  #lang button { padding: 6px 16px; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+  #lang, #size { display: none; gap: 8px; align-items: center; }
+  #size span { color: var(--muted); font-size: 12px; }
+  #lang button, #size button { padding: 6px 16px; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
                  border-radius: 3px; cursor: pointer; font: inherit; }
-  #lang button.on { border-color: var(--accent); color: #fff; }
+  #lang button.on, #size button.on { border-color: var(--accent); color: #fff; }
   #play { display: none; padding: 10px 30px; font: inherit; font-size: 16px; color: #fff; background: var(--accent);
           border: 0; border-radius: 3px; cursor: pointer; }
   #help { color: var(--muted); font-size: 12px; max-width: 560px; }
@@ -36,6 +37,7 @@
   <div id="bar"><div></div></div>
   <div id="status">กำลังโหลด… / Loading…</div>
   <div id="lang"><button data-l="th">ภาษาไทย</button><button data-l="en">English</button></div>
+  <div id="size"><span>ขนาดตัวอักษร / Text size</span><button data-r="1024x768">100%</button><button data-r="800x600">130%</button><button data-r="640x480">160%</button></div>
   <button id="play">เริ่มเกม / Play</button>
   <div id="help">คลิกในเกมเพื่อใช้คีย์บอร์ด · เซฟเกมเก็บไว้ในเบราว์เซอร์นี้<br>
     Click inside the game for keyboard focus. Saves are kept in this browser.</div>
@@ -64,6 +66,22 @@
   });
   showLang();
 
+  // text size: the game's screen mode (its text keeps its pixel size), scaled up to the window by fit()
+  var sizeBox = document.getElementById('size');
+  var res = '800x600';
+  try { res = localStorage.getItem('uplink.res') || res; } catch (e) {}
+  function showSize() {
+    sizeBox.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset.r === res); });
+  }
+  sizeBox.addEventListener('click', function (e) {
+    var r = e.target.dataset && e.target.dataset.r;
+    if (!r) return;
+    res = r;
+    try { localStorage.setItem('uplink.res', r); } catch (err) {}
+    showSize();
+  });
+  showSize();
+
   function fit() {
     var w = canvas.width || 1024, h = canvas.height || 768;
     var s = Math.min(window.innerWidth / w, window.innerHeight / h);
@@ -89,16 +107,17 @@
       ready = true;
       statusEl.textContent = 'พร้อมแล้ว / Ready';
       langBox.style.display = 'flex';
+      sizeBox.style.display = 'flex';
       playBtn.style.display = 'block';
     },
     onGameExit: function () {
       overlay.style.display = 'flex';
-      playBtn.style.display = 'none'; langBox.style.display = 'none';
+      playBtn.style.display = 'none'; langBox.style.display = 'none'; sizeBox.style.display = 'none';
       statusEl.textContent = 'ออกจากเกมแล้ว โหลดหน้าใหม่เพื่อเล่นอีกครั้ง / Game closed. Reload the page to play again.';
     },
     onAbort: function (what) {
       overlay.style.display = 'flex';
-      playBtn.style.display = 'none'; langBox.style.display = 'none';
+      playBtn.style.display = 'none'; langBox.style.display = 'none'; sizeBox.style.display = 'none';
       statusEl.textContent = 'The game stopped: ' + what + ' (see the browser console).';
     }
   };
@@ -107,7 +126,7 @@
     playBtn.style.display = 'none';
     overlay.style.display = 'none';
     canvas.focus();
-    Module.callMain(['/game', '/save', '--lang', lang]);
+    Module.callMain(['/game', '/save', '--lang', lang, '--res', res]);
     fit();
   });
   canvas.addEventListener('mousedown', function () { canvas.focus(); });

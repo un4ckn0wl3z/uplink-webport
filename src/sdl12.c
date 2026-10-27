@@ -14,6 +14,19 @@ SDL_Window *g_window;
 int g_win_w = 1024, g_win_h = 768;      // the game's video mode (logical size)
 uint32_t g_hwnd = 0x00010010u, g_wndproc;
 
+// Options::GetOptionValue(name) (0x492480, thiscall, ret 4) is a "wrap": PORT_RES=WxH (the web page's text size
+// choice) overrides graphics_screenwidth/height, which the game uses for both its layout and its video mode. The
+// text keeps its pixel size, so a smaller mode scaled up to the window makes everything larger.
+void f_492480(void);
+void host_get_option(void) {
+    const char *name = GSTR(ARG(0));
+    int which = !strcmp(name, "graphics_screenwidth") ? 1 : !strcmp(name, "graphics_screenheight") ? 2 : 0;
+    f_492480();
+    const char *res = which ? getenv("PORT_RES") : NULL;
+    int w, h;
+    if (res && sscanf(res, "%dx%d", &w, &h) == 2 && w >= 640 && h >= 480) R.eax = (uint32_t)(which == 1 ? w : h);
+}
+
 void gl1_window_created(SDL_Window *w, int gw, int gh);
 void gl1_present(void);
 void gl1_map_mouse(int wx, int wy, int *gx, int *gy);

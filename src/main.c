@@ -166,6 +166,15 @@ char g_lang[8] = "en";      // --lang th (the page's choice) or PORT_LANG
 
 int main(int argc, char **argv) {
     for (int i = 1; i + 1 < argc; i++) if (!strcmp(argv[i], "--lang")) snprintf(g_lang, sizeof g_lang, "%s", argv[i + 1]);
+    // --res WxH (the page's text size choice): sets PORT_RES, see host_get_option in sdl12.c
+    for (int i = 1; i + 1 < argc; i++)
+        if (!strcmp(argv[i], "--res") && !getenv("PORT_RES")) {
+#ifdef _WIN32
+            _putenv_s("PORT_RES", argv[i + 1]);
+#else
+            setenv("PORT_RES", argv[i + 1], 1);
+#endif
+        }
     if (getenv("PORT_LANG")) snprintf(g_lang, sizeof g_lang, "%s", getenv("PORT_LANG"));
 #ifdef __EMSCRIPTEN__
     snprintf(g_game_dir, sizeof g_game_dir, "/game");
